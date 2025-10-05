@@ -51,6 +51,30 @@
     </div>
 
     <div class="col-12 col-lg-4">
+
+      <!-- Adicionar item -->
+      <div class="card shadow-sm mb-3 border-success">
+        <div class="card-header bg-success text-white">Adicionar item</div>
+        <div class="card-body">
+          <form th:action="@{|/pedidos/checkout/${pedido.id}/adicionar-item|}" method="post" class="row g-2">
+            <div class="col-12">
+              <label class="form-label">Produto</label>
+              <select class="form-select" name="produtoId" required>
+                <option value="">Selecione...</option>
+                <option th:each="p : ${produtos}" th:value="${p.id}" th:text="${p.nome}"></option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Quantidade</label>
+              <input class="form-control" name="quantidade" type="number" min="1" value="1" required>
+            </div>
+            <div class="col-12 d-grid">
+              <button class="btn btn-outline-success" type="submit">Adicionar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <div class="card shadow-sm mb-3 border-success">
         <div class="card-header bg-success text-white">Resumo</div>
         <div class="card-body">

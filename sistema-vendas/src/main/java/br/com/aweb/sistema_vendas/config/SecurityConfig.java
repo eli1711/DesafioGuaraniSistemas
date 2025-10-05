@@ -5,6 +5,7 @@ import br.com.aweb.sistema_vendas.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -44,30 +45,44 @@ public class SecurityConfig {
               // Públicos
               .requestMatchers("/", "/home", "/login", "/css/**", "/js/**", "/images/**").permitAll()
 
-              // Exceções: qualquer autenticado pode abrir/submeter a própria edição
+              // Exceções Web: edição do próprio usuário quando autenticado
               .requestMatchers("/usuarios/editar/*", "/usuarios/atualizar/*").authenticated()
 
-              // Gestão de usuários (exceto as rotas acima): somente ADMIN
+              // Gestão de usuários (Web): somente ADMIN
               .requestMatchers("/usuarios/**").hasRole("ADMIN")
 
-              // Clientes: ADMIN e OPERADOR podem listar/cadastrar/editar/excluir
+              // Clientes (Web): ADMIN e OPERADOR
               .requestMatchers("/clientes/**").hasAnyRole("ADMIN","OPERADOR")
 
-              // Produtos e Pedidos: ADMIN, OPERADOR e CLIENTE
-              .requestMatchers("/produtos/**", "/pedidos/**").hasAnyRole("ADMIN","OPERADOR","CLIENTE")
+              // Produtos (Web): GET lista/busca autenticado; demais ADMIN/OPERADOR
+              .requestMatchers(HttpMethod.GET, "/produtos", "/produtos/buscar").authenticated()
+              .requestMatchers("/produtos/**").hasAnyRole("ADMIN","OPERADOR")
+
+              // Pedidos (Web): ADMIN, OPERADOR e CLIENTE
+              .requestMatchers("/pedidos/**").hasAnyRole("ADMIN","OPERADOR","CLIENTE")
+
+              // ===================== API =====================
+              // Produtos API
+              .requestMatchers(HttpMethod.GET, "/api/produtos/**").hasAnyRole("ADMIN","OPERADOR","CLIENTE")
+              .requestMatchers("/api/produtos/**").hasAnyRole("ADMIN","OPERADOR")
+              // Pedidos API
+              .requestMatchers(HttpMethod.DELETE, "/api/pedidos/**").hasRole("ADMIN")
+              .requestMatchers("/api/pedidos/**").hasAnyRole("ADMIN","OPERADOR","CLIENTE")
+              // Swagger/OpenAPI (opcional liberar em dev)
+              .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
 
               .anyRequest().authenticated()
           )
           .formLogin(form -> form
               .loginPage("/login").permitAll()
-              .successHandler(firstLoginSuccessHandler) // mantém o redirecionamento condicional
+              .successHandler(firstLoginSuccessHandler)
           )
           .logout(logout -> logout
               .logoutUrl("/logout")
               .logoutSuccessUrl("/login?logout").permitAll()
           );
 
-        // Filtro que força troca de senha (bypass para /senha/**, /usuarios/editar|atualizar/**, estáticos, etc.)
+        // Filtro de "must change password"
         http.addFilterAfter(mustChangePasswordFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

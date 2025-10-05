@@ -3,7 +3,7 @@ package br.com.aweb.sistema_vendas.controller;
 import br.com.aweb.sistema_vendas.model.Cliente;
 import br.com.aweb.sistema_vendas.service.ClienteService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
@@ -15,10 +15,10 @@ import java.util.Map;
 
 @Controller
 @RequestMapping("/clientes")
+@RequiredArgsConstructor
 public class ClienteController {
 
-    @Autowired
-    private ClienteService clienteService;
+    private final ClienteService clienteService;
 
     // Listar clientes
     @GetMapping
@@ -54,16 +54,13 @@ public class ClienteController {
         }
 
         try {
-            // Usa o retorno com possível senha provisória quando for cadastro novo
             ClienteService.ClienteSalvarResultado out = clienteService.salvar(cliente);
 
             String mensagem;
             if (out.senhaProvisoria() != null && !out.senhaProvisoria().isBlank()) {
-                // Cadastro novo -> mostra login e senha provisória
                 mensagem = "Cliente salvo! Login: " + out.cliente().getEmail()
                         + " | Senha provisória: " + out.senhaProvisoria();
             } else {
-                // Atualização (sem senha gerada)
                 mensagem = "Cliente atualizado com sucesso!";
             }
 

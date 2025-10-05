@@ -1,10 +1,8 @@
-
 package br.com.aweb.sistema_vendas.controller;
 
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,13 +16,14 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import br.com.aweb.sistema_vendas.model.Produto;
 import br.com.aweb.sistema_vendas.service.ProdutoService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
 @Controller
 @RequestMapping("/produtos")
+@RequiredArgsConstructor
 public class ProdutoController {
     
-    @Autowired
-    private ProdutoService produtoService;
+    private final ProdutoService produtoService;
     
     // Listar todos os produtos
     @GetMapping

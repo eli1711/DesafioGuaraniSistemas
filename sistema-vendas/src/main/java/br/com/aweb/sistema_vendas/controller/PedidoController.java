@@ -26,8 +26,6 @@ public class PedidoController {
     private final PedidoService pedidoService;
     private final ClienteService clienteService;
     private final ProdutoService produtoService;
-
-    /** ✅ Agora realmente injetado pelo Spring (sem = null, sem @Nullable) */
     private final PagamentoService pagamentoService;
 
     private static final String REDIRECT_LIST = "redirect:/pedidos";
@@ -85,16 +83,23 @@ public class PedidoController {
         return mv;
     }
 
-    // ---------- CRIAR ----------
+    // ---------- CRIAR (vários itens) ----------
     @PostMapping("/salvar")
     public String salvar(@RequestParam("clienteId") Long clienteIdParam,
-                         @RequestParam("produtoId") Long produtoId,
-                         @RequestParam("quantidade") Integer quantidade,
+                         @RequestParam("produtoId") List<Long> produtoIds,
+                         @RequestParam("quantidade") List<Integer> quantidades,
                          RedirectAttributes attrs,
                          @AuthenticationPrincipal User principal) {
         try {
             if (principal == null) return "redirect:/login";
-            validarQuantidade(quantidade);
+
+            if (produtoIds == null || produtoIds.isEmpty()) {
+                throw new IllegalArgumentException("Informe ao menos um item.");
+            }
+            if (quantidades == null || quantidades.isEmpty() || quantidades.size() != produtoIds.size()) {
+                throw new IllegalArgumentException("Itens inválidos: listas de produto e quantidade devem ter o mesmo tamanho.");
+            }
+            quantidades.forEach(PedidoController::validarQuantidade);
 
             final Long clienteIdUsar = isAdminOuOperador(principal)
                     ? clienteIdParam
@@ -106,7 +111,13 @@ public class PedidoController {
                     .orElseThrow(() -> new IllegalArgumentException("Cliente não encontrado: " + clienteIdUsar));
 
             Pedido pedido = pedidoService.criarPedido(cliente);
-            pedidoService.adicionarItem(pedido.getId(), produtoId, quantidade);
+
+            // adiciona/mescla todos os itens
+            for (int i = 0; i < produtoIds.size(); i++) {
+                Long produtoId = produtoIds.get(i);
+                Integer qtd = quantidades.get(i);
+                pedidoService.adicionarOuSomarItem(pedido.getId(), produtoId, qtd);
+            }
 
             attrs.addFlashAttribute("mensagem", "Pedido #" + pedido.getId() + " criado com sucesso!");
             return "redirect:/pedidos/checkout/" + pedido.getId();
@@ -148,12 +159,12 @@ public class PedidoController {
             }
         }
 
-        // Atualiza snapshot se existir pagamento pendente
         pagamentoService.atualizarSnapshotSePendente(id);
 
         ModelAndView mv = new ModelAndView(CHECKOUT_VIEW);
         mv.addObject("pedido", pedido);
         mv.addObject("formasPagamento", FormaPagamento.values());
+        mv.addObject("produtos", produtoService.listarTodos()); // para “adicionar item” no checkout
         return mv;
     }
 
@@ -166,6 +177,22 @@ public class PedidoController {
             validarQuantidade(quantidade);
             pedidoService.atualizarQuantidadeItem(pedidoId, itemId, quantidade);
             attrs.addFlashAttribute("mensagem", "Quantidade atualizada.");
+        } catch (Exception e) {
+            attrs.addFlashAttribute("erro", e.getMessage());
+        }
+        return "redirect:/pedidos/checkout/" + pedidoId;
+    }
+
+    // ---------- Adicionar novo item no checkout ----------
+    @PostMapping("/checkout/{pedidoId}/adicionar-item")
+    public String adicionarItemCheckout(@PathVariable Long pedidoId,
+                                        @RequestParam Long produtoId,
+                                        @RequestParam Integer quantidade,
+                                        RedirectAttributes attrs) {
+        try {
+            validarQuantidade(quantidade);
+            pedidoService.adicionarOuSomarItem(pedidoId, produtoId, quantidade);
+            attrs.addFlashAttribute("mensagem", "Item adicionado.");
         } catch (Exception e) {
             attrs.addFlashAttribute("erro", e.getMessage());
         }
@@ -202,7 +229,6 @@ public class PedidoController {
                     );
                 }
             } else {
-                // Mantém pendente, mas persiste detalhes (boleto/transferência)
                 pagamentoService.atualizarDetalhes(id, detalhes);
             }
 

@@ -38,7 +38,7 @@
           </div>
         </td>
         <td class="text-nowrap">
-          <a th:href="@{/pedidos/checkout/{id}(id=${pedido.id})}" class="btn btn-success btn-sm me-1">Checkout</a>
+          <a th:href="@{/pedidos/checkout/{id}(id=${pedido.id})}" class="btn btn-success btn-sm me-1">Realizar Pagamento</a>
           <a th:href="@{/pedidos/excluir/{id}(id=${pedido.id})}" class="btn btn-outline-danger btn-sm"
              onclick="return confirm('Deseja cancelar este pedido?')">Cancelar</a>
         </td>

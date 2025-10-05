@@ -22,10 +22,10 @@
       <div th:if="${mensagem}" class="alert alert-success" th:text="${mensagem}"></div>
       <div th:if="${erro}" class="alert alert-danger" th:text="${erro}"></div>
 
-      <form th:action="@{/pedidos/salvar}" method="post" class="row g-3 needs-validation" novalidate>
+      <form th:action="@{/pedidos/salvar}" method="post" class="needs-validation" novalidate>
 
         <!-- CLIENTE selecionável somente para ADMIN/OPERADOR -->
-        <div class="col-12" sec:authorize="hasAnyRole('ADMIN','OPERADOR')">
+        <div class="mb-3" sec:authorize="hasAnyRole('ADMIN','OPERADOR')">
           <label for="clienteId" class="form-label">Cliente</label>
           <select id="clienteId" name="clienteId" class="form-select" required>
             <option value="">Selecione...</option>
@@ -38,48 +38,51 @@
         </div>
 
         <!-- CLIENTE logado: id vai escondido; exibe apenas informações -->
-        <div class="col-12" sec:authorize="hasRole('CLIENTE')">
-          <!-- envia o id do cliente logado -->
+        <div sec:authorize="hasRole('CLIENTE')" class="mb-3">
           <input type="hidden" name="clienteId" th:value="${clienteAtual != null ? clienteAtual.id : ''}">
           <div th:if="${clienteAtual != null}" class="alert alert-success mb-0">
             <strong>Cliente:</strong>
             <span th:text="${clienteAtual.nome}"></span>
-            <small class="text-muted">(
-              <span th:text="${clienteAtual.email}"></span>
-            )</small>
+            <small class="text-muted">(<span th:text="${clienteAtual.email}"></span>)</small>
           </div>
           <div th:if="${clienteAtual == null}" class="alert alert-warning mb-0">
             Não foi possível identificar seu cadastro de cliente. Contate o suporte.
           </div>
         </div>
 
-        <!-- Produto -->
-        <div class="col-12 col-md-8">
-          <label for="produtoId" class="form-label">Produto</label>
-          <select id="produtoId" name="produtoId" class="form-select" required>
-            <option value="">Selecione...</option>
-            <option th:each="p : ${produtos}" th:value="${p.id}" th:text="${p.nome}"></option>
-          </select>
-          <div class="invalid-feedback">Selecione um produto.</div>
+        <!-- ITENS: linhas dinâmicas -->
+        <div class="table-responsive mb-3">
+          <table class="table align-middle" id="tabela-itens">
+            <thead>
+              <tr>
+                <th style="width:65%">Produto</th>
+                <th style="width:20%">Quantidade</th>
+                <th style="width:15%"></th>
+              </tr>
+            </thead>
+            <tbody id="corpo-itens">
+              <tr>
+                <td>
+                  <select name="produtoId" class="form-select" required>
+                    <option value="">Selecione...</option>
+                    <option th:each="p : ${produtos}" th:value="${p.id}" th:text="${p.nome}"></option>
+                  </select>
+                </td>
+                <td>
+                  <input name="quantidade" type="number" min="1" value="1" class="form-control" required>
+                </td>
+                <td class="text-end">
+                  <button type="button" class="btn btn-outline-success btn-sm" id="btn-add">+ Adicionar</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
-        <!-- Quantidade -->
-        <div class="col-12 col-md-4">
-          <label for="quantidade" class="form-label">Quantidade</label>
-          <input id="quantidade" name="quantidade" type="number" min="1" class="form-control" required>
-          <div class="invalid-feedback">Informe a quantidade.</div>
-        </div>
-
-        <div class="col-12 d-flex gap-2 mt-2">
-          <!-- Desabilita o submit se cliente logado não tiver clienteAtual -->
-          <button type="submit"
-                  class="btn btn-success"
-                  th:disabled="${#authorization.expression('hasRole(''CLIENTE'')') and clienteAtual == null}">
-            Salvar Pedido
-          </button>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-success">Salvar Pedido</button>
           <a th:href="@{/pedidos}" class="btn btn-outline-success">Cancelar</a>
         </div>
-
       </form>
     </div>
   </div>
@@ -87,11 +90,37 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-(()=>{'use strict';const forms=document.querySelectorAll('.needs-validation');
-Array.from(forms).forEach(f=>{f.addEventListener('submit',e=>{
-  if(!f.checkValidity()){e.preventDefault();e.stopPropagation()}
-  f.classList.add('was-validated')
-},false)})})();
+(()=>{'use strict';
+  const corpo = document.getElementById('corpo-itens');
+  const btnAdd = document.getElementById('btn-add');
+
+  function novaLinha(){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <select name="produtoId" class="form-select" required>
+          <option value="">Selecione...</option>
+          ${document.querySelector('select[name="produtoId"]').innerHTML}
+        </select>
+      </td>
+      <td><input name="quantidade" type="number" min="1" value="1" class="form-control" required></td>
+      <td class="text-end">
+        <button type="button" class="btn btn-outline-danger btn-sm btn-rem">Remover</button>
+      </td>`;
+    corpo.appendChild(tr);
+    tr.querySelector('.btn-rem').addEventListener('click', ()=> tr.remove());
+  }
+
+  btnAdd.addEventListener('click', novaLinha);
+
+  const forms=document.querySelectorAll('.needs-validation');
+  Array.from(forms).forEach(f=>{
+    f.addEventListener('submit',e=>{
+      if(!f.checkValidity()){e.preventDefault();e.stopPropagation()}
+      f.classList.add('was-validated')
+    },false)
+  });
+})();
 </script>
 </body>
 </html>

@@ -18,8 +18,6 @@ public class PedidoService {
 
     private final PedidoRepository pedidoRepository;
     private final ProdutoRepository produtoRepository;
-
-    /** ✅ Injetado corretamente (sem = null) */
     private final PagamentoService pagamentoService;
 
     // -------- LISTAGENS --------
@@ -47,8 +45,11 @@ public class PedidoService {
         return pedidoRepository.save(pedido);
     }
 
+    /**
+     * Adiciona item novo OU soma na linha existente do mesmo produto.
+     */
     @Transactional
-    public Pedido adicionarItem(Long pedidoId, Long produtoId, Integer quantidade) {
+    public Pedido adicionarOuSomarItem(Long pedidoId, Long produtoId, Integer quantidade) {
         if (quantidade == null || quantidade < 1) {
             throw new IllegalArgumentException("Quantidade deve ser >= 1");
         }
@@ -56,19 +57,36 @@ public class PedidoService {
         Pedido pedido = buscarPorId(pedidoId)
                 .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
         if (pedido.getStatus() != StatusPedido.ATIVO) {
-            throw new RuntimeException("Não é possível adicionar itens em pedido cancelado.");
+            throw new RuntimeException("Não é possível alterar itens de pedido não ativo.");
         }
 
         Produto produto = produtoRepository.findById(produtoId)
                 .orElseThrow(() -> new RuntimeException("Produto não encontrado"));
 
-        if (produto.getQuantidadeEmEstoque() < quantidade) {
+        // verifica estoque total necessário (somando se já existir)
+        int necessario = quantidade;
+        Optional<ItemPedido> existenteOpt = pedido.getItens().stream()
+                .filter(i -> i.getProduto().getId().equals(produtoId))
+                .findFirst();
+
+        if (existenteOpt.isPresent()) {
+            // vamos aumentar de N para N+quantidade => precisa do delta
+            necessario = quantidade;
+        }
+
+        if (produto.getQuantidadeEmEstoque() < necessario) {
             throw new RuntimeException("Estoque insuficiente para o produto: " + produto.getNome());
         }
 
-        ItemPedido item = new ItemPedido(pedido, produto, quantidade);
-        pedido.adicionarItem(item);
+        if (existenteOpt.isPresent()) {
+            ItemPedido item = existenteOpt.get();
+            item.setQuantidade(item.getQuantidade() + quantidade);
+        } else {
+            ItemPedido novo = new ItemPedido(pedido, produto, quantidade);
+            pedido.adicionarItem(novo);
+        }
 
+        // baixa do estoque o que entrou agora
         produto.setQuantidadeEmEstoque(produto.getQuantidadeEmEstoque() - quantidade);
         produtoRepository.save(produto);
 
@@ -76,7 +94,6 @@ public class PedidoService {
         Pedido salvo = pedidoRepository.save(pedido);
 
         pagamentoService.atualizarSnapshotSePendente(pedidoId);
-
         return salvo;
     }
 

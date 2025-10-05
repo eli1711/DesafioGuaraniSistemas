@@ -3,17 +3,17 @@ package br.com.aweb.sistema_vendas.service;
 import br.com.aweb.sistema_vendas.model.Produto;
 import br.com.aweb.sistema_vendas.repository.ProdutoRepository;
 import jakarta.transaction.Transactional;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class ProdutoService {
 
-    @Autowired
-    private ProdutoRepository produtoRepository;
+    private final ProdutoRepository produtoRepository;
 
     @Transactional
     public Produto salvar(Produto produto) {
@@ -36,5 +36,4 @@ public class ProdutoService {
     public List<Produto> buscarPorNome(String nome) {
         return produtoRepository.findByNomeContainingIgnoreCase(nome);
     }
-    
 }
