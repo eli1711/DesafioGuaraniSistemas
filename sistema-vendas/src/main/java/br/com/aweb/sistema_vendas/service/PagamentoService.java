@@ -7,8 +7,6 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-
 @Service
 @RequiredArgsConstructor
 public class PagamentoService {
@@ -18,6 +16,8 @@ public class PagamentoService {
 
     @Transactional
     public Pagamento iniciarPagamento(Long pedidoId, FormaPagamento forma) {
+        if (forma == null) throw new IllegalArgumentException("Forma de pagamento é obrigatória");
+
         Pedido pedido = pedidoRepository.findById(pedidoId)
                 .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
 
@@ -28,28 +28,31 @@ public class PagamentoService {
             throw new RuntimeException("Pedido cancelado não pode ser pago");
         }
 
-        // idempotência simples: se já existe aprovado, não deixa pagar de novo
+        // Totais atualizados antes do snapshot
+        pedido.recalcularTotais();
+
+        // Idempotência simples
         Pagamento existente = pagamentoRepository.findByPedido(pedido).orElse(null);
         if (existente != null) {
             if (existente.getStatus() == StatusPagamento.APROVADO) {
                 return existente; // já pago
             }
-            // se pendente/recusado/cancelado, vamos atualizar o snapshot e reusar o mesmo registro
             existente.setForma(forma);
-            pedido.recalcularTotais();
             existente.snapshotFrom(pedido);
             existente.setStatus(StatusPagamento.PENDENTE);
+            existente.setPago(Boolean.FALSE); // ⭐ garantir NOT NULL e coerência
             return pagamentoRepository.save(existente);
         }
 
-        // novo pagamento
-        pedido.recalcularTotais();
+        // Novo pagamento
         Pagamento pag = Pagamento.builder()
                 .pedido(pedido)
                 .forma(forma)
                 .status(StatusPagamento.PENDENTE)
+                .pago(Boolean.FALSE) // ⭐ garantir NOT NULL e coerência
                 .build();
         pag.snapshotFrom(pedido);
+
         return pagamentoRepository.save(pag);
     }
 
@@ -57,13 +60,22 @@ public class PagamentoService {
     public Pagamento confirmarPagamento(Long pedidoId, boolean autorizado, String referenciaExterna, String detalhes) {
         Pedido pedido = pedidoRepository.findById(pedidoId)
                 .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+
         Pagamento pagamento = pagamentoRepository.findByPedido(pedido)
                 .orElseThrow(() -> new RuntimeException("Pagamento não iniciado"));
 
-        if (pagamento.getStatus() == StatusPagamento.APROVADO) return pagamento; // idempotente
+        if (pagamento.getStatus() == StatusPagamento.APROVADO) {
+            return pagamento; // idempotente
+        }
 
-        // aqui você chamaria o PSP e decidiria 'autorizado'
-        pagamento.setStatus(autorizado ? StatusPagamento.APROVADO : StatusPagamento.RECUSADO);
+        if (autorizado) {
+            pagamento.setStatus(StatusPagamento.APROVADO);
+            pagamento.setPago(Boolean.TRUE);  // ⭐
+        } else {
+            pagamento.setStatus(StatusPagamento.RECUSADO);
+            pagamento.setPago(Boolean.FALSE); // ⭐
+        }
+
         pagamento.setReferenciaExterna(referenciaExterna);
         pagamento.setDetalhes(detalhes);
 
@@ -74,41 +86,32 @@ public class PagamentoService {
     public Pagamento atualizarSnapshotSePendente(Long pedidoId) {
         Pedido pedido = pedidoRepository.findById(pedidoId)
                 .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+
         Pagamento pagamento = pagamentoRepository.findByPedido(pedido).orElse(null);
         if (pagamento != null && pagamento.getStatus() == StatusPagamento.PENDENTE) {
             pedido.recalcularTotais();
             pagamento.snapshotFrom(pedido);
+            // pago continua false enquanto estiver PENDENTE
+            if (pagamento.getPago() == null) pagamento.setPago(Boolean.FALSE);
             return pagamentoRepository.save(pagamento);
         }
-        return pagamento; // null ou não pendente (sem alteração)
+        return pagamento; // null ou não pendente
     }
-    // PagamentoService.java
-@Transactional
-public Pagamento garantirPagamentoPendente(Long pedidoId) {
-    Pedido pedido = pedidoRepository.findById(pedidoId)
-            .orElseThrow(() -> new IllegalArgumentException("Pedido não encontrado"));
-    return pagamentoRepository.findByPedidoId(pedidoId)
-            .orElseGet(() -> {
-                Pagamento pg = new Pagamento();
-                pg.setPedido(pedido);
-                pg.setStatus(StatusPagamento.PENDENTE);
-                pg.setForma(FormaPagamento.BOLETO); // ou deixe null até o usuário escolher
-                pg.setValorFinal(pedido.getValorTotal());
-                return pagamentoRepository.save(pg);
-            });
-}
-
 
     @Transactional
     public void cancelarPagamento(Long pedidoId) {
         Pedido pedido = pedidoRepository.findById(pedidoId)
                 .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+
         Pagamento pagamento = pagamentoRepository.findByPedido(pedido)
                 .orElseThrow(() -> new RuntimeException("Pagamento não encontrado"));
+
         if (pagamento.getStatus() == StatusPagamento.APROVADO) {
             throw new RuntimeException("Pagamento aprovado não pode ser cancelado");
         }
+
         pagamento.setStatus(StatusPagamento.CANCELADO);
+        pagamento.setPago(Boolean.FALSE); // ⭐ coerência com status
         pagamentoRepository.save(pagamento);
     }
 }

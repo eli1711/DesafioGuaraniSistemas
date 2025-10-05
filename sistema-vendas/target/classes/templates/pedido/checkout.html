@@ -20,6 +20,7 @@
   </div>
 
   <div class="row g-4">
+
     <!-- Itens -->
     <div class="col-12 col-lg-8">
       <div class="card shadow-sm">
@@ -51,9 +52,7 @@
                   </form>
                 </td>
                 <td class="text-end" th:text="${#numbers.formatCurrency(it.subtotal)}"></td>
-                <td>
-                  <!-- Se quiser, adicione um botão para remover item usando seu endpoint existente -->
-                </td>
+                <td><!-- botão de remover item, se quiser --></td>
               </tr>
               <tr th:if="${#lists.isEmpty(pedido.itens)}">
                 <td colspan="5" class="text-center text-muted">Sem itens.</td>
@@ -67,6 +66,8 @@
 
     <!-- Resumo + Pagamento -->
     <div class="col-12 col-lg-4">
+
+      <!-- Resumo -->
       <div class="card shadow-sm mb-3">
         <div class="card-header bg-dark text-white">Resumo</div>
         <div class="card-body">
@@ -84,6 +85,7 @@
             <dd class="col-6 text-end fs-5 fw-semibold" th:text="${#numbers.formatCurrency(pedido.valorTotal)}"></dd>
           </dl>
 
+          <!-- aplicar frete/desconto -->
           <form th:action="@{|/pedidos/checkout/${pedido.id}/resumo|}" method="post" class="row g-2">
             <div class="col-6">
               <label class="form-label">Desconto (R$)</label>
@@ -102,22 +104,27 @@
         </div>
       </div>
 
+      <!-- Pagamento -->
       <div class="card shadow-sm">
         <div class="card-header bg-success text-white">Pagamento</div>
         <div class="card-body">
           <form th:action="@{|/pedidos/checkout/${pedido.id}/pagar|}" method="post" class="row g-3">
             <div class="col-12">
-              <label class="form-label">Forma de pagamento</label>
-              <select class="form-select" name="forma" required>
+              <label class="form-label" for="forma">Forma de pagamento</label>
+              <select class="form-select" id="forma" name="forma" required>
                 <option value="">Selecione...</option>
-                <option th:each="f : ${formas}" th:value="${f}" th:text="${f}"></option>
+                <!-- Busca diretamente do enum, sem depender do Model -->
+                <option th:each="f : ${T(br.com.aweb.sistema_vendas.model.FormaPagamento).values()}"
+                        th:value="${f.name()}"
+                        th:text="${#strings.capitalize(f.name().replace('_',' '))}">
+                </option>
               </select>
             </div>
 
-            <!-- Campo livre para simular dados (ex.: últimos 4 do cartão, linha digitável, etc.) -->
             <div class="col-12">
-              <label class="form-label">Detalhes (opcional)</label>
-              <input class="form-control" name="detalhes" placeholder="ex.: cartao **** 1234 / boleto 341...">
+              <label class="form-label" for="detalhes">Detalhes (opcional)</label>
+              <input class="form-control" id="detalhes" name="detalhes"
+                     placeholder="ex.: cartao **** 1234 / boleto 341...">
             </div>
 
             <div class="col-12 d-grid">

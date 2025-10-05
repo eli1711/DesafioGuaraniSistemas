@@ -30,40 +30,46 @@ public class Pagamento {
     @JoinColumn(name = "pedido_id", nullable = false, unique = true)
     private Pedido pedido;
 
+    /** coluna no BD: forma_pagamento */
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "forma_pagamento", nullable = false, length = 30)
     private FormaPagamento forma;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "status", nullable = false, length = 20)
     private StatusPagamento status; // PENDENTE, APROVADO, RECUSADO, CANCELADO
 
     // --- Snapshot financeiro do pedido no momento do pagamento ---
     @NotNull
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(name = "total_produtos", nullable = false, precision = 15, scale = 2)
     private BigDecimal totalProdutos;
 
     @NotNull
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(name = "desconto", nullable = false, precision = 15, scale = 2)
     private BigDecimal desconto;
 
     @NotNull
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(name = "frete", nullable = false, precision = 15, scale = 2)
     private BigDecimal frete;
 
     @NotNull
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(name = "valor_final", nullable = false, precision = 15, scale = 2)
     private BigDecimal valorFinal;
 
-    // Dados auxiliares
-    @Column(length = 120)
+    @Column(name = "referencia_externa", length = 120)
     private String referenciaExterna;
 
     @Builder.Default
+    @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm = LocalDateTime.now();
 
-    @Column(length = 2000)
+    @Column(name = "detalhes", length = 2000)
     private String detalhes;
+
+    /** ⭐ novo mapeamento: coluna NOT NULL no BD */
+    @Builder.Default
+    @Column(name = "pago", nullable = false)
+    private Boolean pago = Boolean.FALSE;
 
     /** Copia (fotografa) os totais do Pedido atual para o Pagamento */
     public void snapshotFrom(Pedido pedido) {
@@ -84,5 +90,22 @@ public class Pagamento {
         this.desconto      = this.desconto.setScale(SCALE, RoundingMode.HALF_UP);
         this.frete         = this.frete.setScale(SCALE, RoundingMode.HALF_UP);
         this.valorFinal    = this.valorFinal.setScale(SCALE, RoundingMode.HALF_UP);
+    }
+
+    /** Garante NOT NULLs e consistência antes do INSERT */
+    @PrePersist
+    public void prePersist() {
+        if (criadoEm == null) criadoEm = LocalDateTime.now();
+        if (status == null)   status = StatusPagamento.PENDENTE;
+        if (forma == null)    throw new IllegalStateException("Forma de pagamento obrigatória");
+
+        if (totalProdutos == null) totalProdutos = BigDecimal.ZERO;
+        if (desconto == null)      desconto = BigDecimal.ZERO;
+        if (frete == null)         frete = BigDecimal.ZERO;
+        if (valorFinal == null)    valorFinal = BigDecimal.ZERO;
+
+        if (pago == null)          pago = Boolean.FALSE;
+
+        normalizeScale();
     }
 }

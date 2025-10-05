@@ -2,7 +2,6 @@ package br.com.aweb.sistema_vendas.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -19,20 +18,16 @@ public class Pedido {
 
     private static final int SCALE = 2;
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Concorrência otimista
     @Version
     private Long version;
 
-    // Relacionamento com Cliente
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "cliente_id", nullable = false)
     private Cliente cliente;
 
-    // Status do pedido
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
@@ -42,7 +37,6 @@ public class Pedido {
     @Column(nullable = false)
     private LocalDateTime dataHora = LocalDateTime.now();
 
-    // Totais financeiros (BigDecimal!)
     @Builder.Default
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal valorTotal = BigDecimal.ZERO;
@@ -55,12 +49,14 @@ public class Pedido {
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal desconto = BigDecimal.ZERO;
 
-    // Relacionamento 1:N com ItemPedido
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<ItemPedido> itens = new ArrayList<>();
 
-    /** Construtor prático exigindo Cliente */
+    /** ⭐ ADICIONE ESTE RELACIONAMENTO */
+    @OneToOne(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private Pagamento pagamento;
+
     public Pedido(Cliente cliente) {
         this.cliente = cliente;
         this.status = StatusPedido.ATIVO;
@@ -71,7 +67,6 @@ public class Pedido {
         this.itens = new ArrayList<>();
     }
 
-    /** Soma dos subtotais dos itens (sem frete/desconto) */
     @Transient
     public BigDecimal getTotalProdutos() {
         return itens.stream()
@@ -80,14 +75,12 @@ public class Pedido {
                 .setScale(SCALE, RoundingMode.HALF_UP);
     }
 
-    /** Adiciona item e recalcula totais */
     public void adicionarItem(ItemPedido item) {
         item.setPedido(this);
         this.itens.add(item);
         recalcularTotais();
     }
 
-    /** Recalcula valorTotal = totalProdutos - desconto + frete (mínimo 0) */
     public void recalcularTotais() {
         BigDecimal totalProdutos = getTotalProdutos();
         BigDecimal d = (desconto == null ? BigDecimal.ZERO : desconto).setScale(SCALE, RoundingMode.HALF_UP);
@@ -101,13 +94,9 @@ public class Pedido {
         this.frete = f;
     }
 
-    /** Retrocompatibilidade com código antigo */
     @Deprecated
-    public void calcularValorTotal() {
-        recalcularTotais();
-    }
+    public void calcularValorTotal() { recalcularTotais(); }
 
-    /** Normaliza defaults antes de persistir */
     @PrePersist
     public void prePersist() {
         if (this.status == null) this.status = StatusPedido.ATIVO;
@@ -116,7 +105,6 @@ public class Pedido {
         if (this.frete == null) this.frete = BigDecimal.ZERO;
         if (this.desconto == null) this.desconto = BigDecimal.ZERO;
         if (this.itens == null) this.itens = new ArrayList<>();
-        // garante scale
         this.valorTotal = this.valorTotal.setScale(SCALE, RoundingMode.HALF_UP);
         this.frete = this.frete.setScale(SCALE, RoundingMode.HALF_UP);
         this.desconto = this.desconto.setScale(SCALE, RoundingMode.HALF_UP);
