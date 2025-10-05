@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Lista de Pedidos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+</head>
+<body>
+
+<div class="container mt-4">
+    <h2 class="mb-3">Pedidos</h2>
+
+    <!-- mensagens flash -->
+    <div th:if="${mensagem}" class="alert alert-success" th:text="${mensagem}"></div>
+    <div th:if="${erro}" class="alert alert-danger" th:text="${erro}"></div>
+
+    <a th:href="@{/pedidos/novo}" class="btn btn-success mb-3">Novo Pedido</a>
+
+    <table class="table table-bordered align-middle">
+        <thead class="table-light">
+        <tr>
+            <th>ID</th>
+            <th>Cliente</th>
+            <th>Data</th>
+            <th>Status Pedido</th>
+            <th>Valor Total</th>
+            <th>Pagamento</th>
+            <th>Ações</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="pedido : ${pedidos}">
+            <td th:text="${pedido.id}"></td>
+
+            <td th:text="${pedido.cliente != null ? pedido.cliente.nome : '—'}"></td>
+
+            <td th:text="${pedido.dataHora != null ? #temporals.format(pedido.dataHora, 'dd/MM/yyyy HH:mm') : '—'}"></td>
+
+            <td>
+                <span class="badge text-bg-secondary" th:text="${pedido.status != null ? pedido.status : '—'}"></span>
+            </td>
+
+            <td th:text="${pedido.valorTotal != null ? #numbers.formatCurrency(pedido.valorTotal) : #numbers.formatCurrency(0)}"></td>
+
+            <!-- Coluna Pagamento (status, forma e valor final) -->
+            <td>
+                <div class="d-flex flex-column gap-1">
+                    <div>
+                        <small class="text-muted">Status:</small>
+                        <span th:classappend="${(pedido.pagamento != null && pedido.pagamento.status != null) ? 
+                                               (pedido.pagamento.status.name() == 'APROVADO' ? ' badge text-bg-success' :
+                                               (pedido.pagamento.status.name() == 'PENDENTE' ? ' badge text-bg-warning' :
+                                               (pedido.pagamento.status.name() == 'RECUSADO' ? ' badge text-bg-danger' :
+                                                ' badge text-bg-secondary'))) : ' badge text-bg-secondary'}"
+                              th:text="${pedido.pagamento != null && pedido.pagamento.status != null ? pedido.pagamento.status : '—'}">
+                        </span>
+                    </div>
+                    <div>
+                        <small class="text-muted">Forma:</small>
+                        <span th:text="${pedido.pagamento != null && pedido.pagamento.forma != null ? pedido.pagamento.forma : '—'}"></span>
+                    </div>
+                    <div>
+                        <small class="text-muted">Valor final:</small>
+                        <strong th:text="${pedido.pagamento != null && pedido.pagamento.valorFinal != null ? 
+                                          #numbers.formatCurrency(pedido.pagamento.valorFinal) : '—'}"></strong>
+                    </div>
+                </div>
+            </td>
+
+            <!-- Ações -->
+            <td class="text-nowrap">
+                <a th:href="@{/pedidos/checkout/{id}(id=${pedido.id})}" class="btn btn-primary btn-sm me-1">
+                    Checkout
+                </a>
+
+                <a th:href="@{/pedidos/excluir/{id}(id=${pedido.id})}"
+                   class="btn btn-outline-danger btn-sm"
+                   onclick="return confirm('Deseja realmente cancelar este pedido?')">
+                    Cancelar
+                </a>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+</body>
+</html>
