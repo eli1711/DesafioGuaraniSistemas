@@ -19,20 +19,34 @@ public class PedidoService {
     private final PedidoRepository pedidoRepository;
     private final ProdutoRepository produtoRepository;
 
-    // Opcional, mas recomendado: manter o snapshot do pagamento atualizado quando PENDENTE
-    private final PagamentoService pagamentoService; // se não tiver ainda, remova o field e as chamadas
+    /** ✅ Injetado corretamente (sem = null) */
+    private final PagamentoService pagamentoService;
 
-    // Criar pedido
+    // -------- LISTAGENS --------
+    @Transactional(readOnly = true)
+    public List<Pedido> listarTodosOrdenado() {
+        return pedidoRepository.findAllByOrderByDataHoraDesc();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Pedido> listarDoClienteOrdenado(String emailCliente) {
+        return pedidoRepository.findByClienteEmailOrderByDataHoraDesc(emailCliente);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Pedido> listarPorStatusOrdenado(StatusPedido status) {
+        return pedidoRepository.findByStatusOrderByDataHoraDesc(status);
+    }
+
+    // -------- CRUD / REGRAS --------
     @Transactional
     public Pedido criarPedido(Cliente cliente) {
         Pedido pedido = new Pedido(cliente);
         pedido.setDataHora(LocalDateTime.now());
-        // garante defaults de totais:
         pedido.recalcularTotais();
         return pedidoRepository.save(pedido);
     }
 
-    // Adicionar item ao pedido
     @Transactional
     public Pedido adicionarItem(Long pedidoId, Long produtoId, Integer quantidade) {
         if (quantidade == null || quantidade < 1) {
@@ -52,27 +66,20 @@ public class PedidoService {
             throw new RuntimeException("Estoque insuficiente para o produto: " + produto.getNome());
         }
 
-        // cria o item (preço unitário é “fotografado” do produto)
         ItemPedido item = new ItemPedido(pedido, produto, quantidade);
         pedido.adicionarItem(item);
 
-        // atualiza estoque
         produto.setQuantidadeEmEstoque(produto.getQuantidadeEmEstoque() - quantidade);
         produtoRepository.save(produto);
 
-        // recalcula totais do pedido
         pedido.recalcularTotais();
         Pedido salvo = pedidoRepository.save(pedido);
 
-        // mantém pagamento pendente coerente (snapshot)
-        if (pagamentoService != null) {
-            pagamentoService.atualizarSnapshotSePendente(pedidoId);
-        }
+        pagamentoService.atualizarSnapshotSePendente(pedidoId);
 
         return salvo;
     }
 
-    // Atualizar quantidade de um item (recalcula totais e estoque)
     @Transactional
     public Pedido atualizarQuantidadeItem(Long pedidoId, Long itemId, Integer novaQuantidade) {
         if (novaQuantidade == null || novaQuantidade < 1) {
@@ -95,13 +102,11 @@ public class PedidoService {
 
         Produto produto = item.getProduto();
         if (delta > 0) {
-            // consumir mais estoque
             if (produto.getQuantidadeEmEstoque() < delta) {
                 throw new RuntimeException("Estoque insuficiente para o produto: " + produto.getNome());
             }
             produto.setQuantidadeEmEstoque(produto.getQuantidadeEmEstoque() - delta);
         } else if (delta < 0) {
-            // devolver ao estoque
             produto.setQuantidadeEmEstoque(produto.getQuantidadeEmEstoque() + Math.abs(delta));
         }
         produtoRepository.save(produto);
@@ -110,14 +115,11 @@ public class PedidoService {
         pedido.recalcularTotais();
         Pedido salvo = pedidoRepository.save(pedido);
 
-        if (pagamentoService != null) {
-            pagamentoService.atualizarSnapshotSePendente(pedidoId);
-        }
+        pagamentoService.atualizarSnapshotSePendente(pedidoId);
 
         return salvo;
     }
 
-    // Remover item do pedido
     @Transactional
     public Pedido removerItem(Long pedidoId, Long itemId) {
         Pedido pedido = buscarPorId(pedidoId)
@@ -131,7 +133,6 @@ public class PedidoService {
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Item não encontrado no pedido."));
 
-        // devolve estoque
         Produto produto = item.getProduto();
         produto.setQuantidadeEmEstoque(produto.getQuantidadeEmEstoque() + item.getQuantidade());
         produtoRepository.save(produto);
@@ -140,14 +141,11 @@ public class PedidoService {
         pedido.recalcularTotais();
         Pedido salvo = pedidoRepository.save(pedido);
 
-        if (pagamentoService != null) {
-            pagamentoService.atualizarSnapshotSePendente(pedidoId);
-        }
+        pagamentoService.atualizarSnapshotSePendente(pedidoId);
 
         return salvo;
     }
 
-    // Aplicar frete e desconto (valores absolutos em R$)
     @Transactional
     public Pedido aplicarFreteEDesconto(Long pedidoId, BigDecimal frete, BigDecimal desconto) {
         Pedido pedido = buscarPorId(pedidoId)
@@ -169,14 +167,11 @@ public class PedidoService {
 
         Pedido salvo = pedidoRepository.save(pedido);
 
-        if (pagamentoService != null) {
-            pagamentoService.atualizarSnapshotSePendente(pedidoId);
-        }
+        pagamentoService.atualizarSnapshotSePendente(pedidoId);
 
         return salvo;
     }
 
-    // Cancelar pedido (devolve estoque dos itens)
     @Transactional
     public Pedido cancelarPedido(Long pedidoId) {
         Pedido pedido = buscarPorId(pedidoId)
@@ -190,31 +185,11 @@ public class PedidoService {
 
         pedido.setStatus(StatusPedido.CANCELADO);
         pedido.recalcularTotais();
-        Pedido salvo = pedidoRepository.save(pedido);
-
-        // opcional: cancelar pagamento se ainda não aprovado
-        // if (pagamentoService != null) {
-        //     pagamentoService.cancelarPagamento(pedidoId);
-        // }
-
-        return salvo;
+        return pedidoRepository.save(pedido);
     }
 
-    // Buscar por ID
     @Transactional(readOnly = true)
     public Optional<Pedido> buscarPorId(Long id) {
         return pedidoRepository.findById(id);
-    }
-
-    // Listar todos
-    @Transactional(readOnly = true)
-    public List<Pedido> listarTodos() {
-        return pedidoRepository.findAll();
-    }
-
-    // Listar por status
-    @Transactional(readOnly = true)
-    public List<Pedido> listarPorStatus(StatusPedido status) {
-        return pedidoRepository.findByStatus(status);
     }
 }

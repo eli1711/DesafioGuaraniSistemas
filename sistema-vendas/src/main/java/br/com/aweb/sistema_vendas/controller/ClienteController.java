@@ -54,10 +54,24 @@ public class ClienteController {
         }
 
         try {
-            clienteService.salvar(cliente);
-            attributes.addFlashAttribute("mensagem", "Cliente salvo com sucesso!");
+            // Usa o retorno com possível senha provisória quando for cadastro novo
+            ClienteService.ClienteSalvarResultado out = clienteService.salvar(cliente);
+
+            String mensagem;
+            if (out.senhaProvisoria() != null && !out.senhaProvisoria().isBlank()) {
+                // Cadastro novo -> mostra login e senha provisória
+                mensagem = "Cliente salvo! Login: " + out.cliente().getEmail()
+                        + " | Senha provisória: " + out.senhaProvisoria();
+            } else {
+                // Atualização (sem senha gerada)
+                mensagem = "Cliente atualizado com sucesso!";
+            }
+
+            attributes.addFlashAttribute("mensagem", mensagem);
+
         } catch (Exception e) {
             attributes.addFlashAttribute("erro", "Erro ao salvar cliente: " + e.getMessage());
+            return "redirect:/clientes/novo";
         }
         return "redirect:/clientes";
     }

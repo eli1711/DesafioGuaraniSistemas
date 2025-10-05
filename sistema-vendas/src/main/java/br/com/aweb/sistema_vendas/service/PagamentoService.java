@@ -28,10 +28,8 @@ public class PagamentoService {
             throw new RuntimeException("Pedido cancelado não pode ser pago");
         }
 
-        // Totais atualizados antes do snapshot
         pedido.recalcularTotais();
 
-        // Idempotência simples
         Pagamento existente = pagamentoRepository.findByPedido(pedido).orElse(null);
         if (existente != null) {
             if (existente.getStatus() == StatusPagamento.APROVADO) {
@@ -40,16 +38,15 @@ public class PagamentoService {
             existente.setForma(forma);
             existente.snapshotFrom(pedido);
             existente.setStatus(StatusPagamento.PENDENTE);
-            existente.setPago(Boolean.FALSE); // ⭐ garantir NOT NULL e coerência
+            existente.setPago(Boolean.FALSE);
             return pagamentoRepository.save(existente);
         }
 
-        // Novo pagamento
         Pagamento pag = Pagamento.builder()
                 .pedido(pedido)
                 .forma(forma)
                 .status(StatusPagamento.PENDENTE)
-                .pago(Boolean.FALSE) // ⭐ garantir NOT NULL e coerência
+                .pago(Boolean.FALSE)
                 .build();
         pag.snapshotFrom(pedido);
 
@@ -70,10 +67,13 @@ public class PagamentoService {
 
         if (autorizado) {
             pagamento.setStatus(StatusPagamento.APROVADO);
-            pagamento.setPago(Boolean.TRUE);  // ⭐
+            pagamento.setPago(Boolean.TRUE);
+            /** ✅ Ao aprovar, conclui o pedido */
+            pedido.setStatus(StatusPedido.CONCLUIDO);
+            pedidoRepository.save(pedido);
         } else {
             pagamento.setStatus(StatusPagamento.RECUSADO);
-            pagamento.setPago(Boolean.FALSE); // ⭐
+            pagamento.setPago(Boolean.FALSE);
         }
 
         pagamento.setReferenciaExterna(referenciaExterna);
@@ -91,11 +91,10 @@ public class PagamentoService {
         if (pagamento != null && pagamento.getStatus() == StatusPagamento.PENDENTE) {
             pedido.recalcularTotais();
             pagamento.snapshotFrom(pedido);
-            // pago continua false enquanto estiver PENDENTE
             if (pagamento.getPago() == null) pagamento.setPago(Boolean.FALSE);
             return pagamentoRepository.save(pagamento);
         }
-        return pagamento; // null ou não pendente
+        return pagamento;
     }
 
     @Transactional
@@ -111,7 +110,20 @@ public class PagamentoService {
         }
 
         pagamento.setStatus(StatusPagamento.CANCELADO);
-        pagamento.setPago(Boolean.FALSE); // ⭐ coerência com status
+        pagamento.setPago(Boolean.FALSE);
         pagamentoRepository.save(pagamento);
+    }
+
+    /** ✅ Utilitário para persistir detalhes quando não há confirmação imediata (boleto/transferência) */
+    @Transactional
+    public Pagamento atualizarDetalhes(Long pedidoId, String detalhes) {
+        Pedido pedido = pedidoRepository.findById(pedidoId)
+                .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+
+        Pagamento pagamento = pagamentoRepository.findByPedido(pedido)
+                .orElseThrow(() -> new RuntimeException("Pagamento não iniciado"));
+
+        pagamento.setDetalhes(detalhes);
+        return pagamentoRepository.save(pagamento);
     }
 }

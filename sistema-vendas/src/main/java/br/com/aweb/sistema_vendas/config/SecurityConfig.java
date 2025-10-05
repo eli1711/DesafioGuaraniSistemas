@@ -12,17 +12,18 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final UsuarioRepository usuarioRepository;
+    private final FirstLoginSuccessHandler firstLoginSuccessHandler;
+    private final MustChangePasswordFilter mustChangePasswordFilter;
 
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+    public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
 
     @Bean
     public UserDetailsService userDetailsService() {
@@ -30,7 +31,7 @@ public class SecurityConfig {
             .filter(Usuario::isAtivo)
             .map(u -> User.withUsername(u.getUsername())
                 .password(u.getSenhaHash())
-                .roles(u.getRole().name()) // ADMIN | CLIENTE | OPERADOR
+                .roles(u.getRole().name())
                 .build())
             .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado ou inativo"));
     }
@@ -40,11 +41,17 @@ public class SecurityConfig {
         http
           .csrf(csrf -> csrf.disable())
           .authorizeHttpRequests(auth -> auth
-              // públicos
+              // Públicos
               .requestMatchers("/", "/home", "/login", "/css/**", "/js/**", "/images/**").permitAll()
 
-              // ADMIN: gestão de usuários e clientes
-              .requestMatchers("/usuarios/**", "/clientes/**").hasRole("ADMIN")
+              // Exceções: qualquer autenticado pode abrir/submeter a própria edição
+              .requestMatchers("/usuarios/editar/*", "/usuarios/atualizar/*").authenticated()
+
+              // Gestão de usuários (exceto as rotas acima): somente ADMIN
+              .requestMatchers("/usuarios/**").hasRole("ADMIN")
+
+              // Clientes: ADMIN e OPERADOR podem listar/cadastrar/editar/excluir
+              .requestMatchers("/clientes/**").hasAnyRole("ADMIN","OPERADOR")
 
               // Produtos e Pedidos: ADMIN, OPERADOR e CLIENTE
               .requestMatchers("/produtos/**", "/pedidos/**").hasAnyRole("ADMIN","OPERADOR","CLIENTE")
@@ -53,13 +60,15 @@ public class SecurityConfig {
           )
           .formLogin(form -> form
               .loginPage("/login").permitAll()
-              .defaultSuccessUrl("/home", true)
+              .successHandler(firstLoginSuccessHandler) // mantém o redirecionamento condicional
           )
           .logout(logout -> logout
               .logoutUrl("/logout")
               .logoutSuccessUrl("/login?logout").permitAll()
-          )
-          .httpBasic(); // sem Customizer
+          );
+
+        // Filtro que força troca de senha (bypass para /senha/**, /usuarios/editar|atualizar/**, estáticos, etc.)
+        http.addFilterAfter(mustChangePasswordFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

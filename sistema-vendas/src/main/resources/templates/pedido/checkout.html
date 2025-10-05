@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <title>Checkout do Pedido</title>
-  <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <style>:root{--bs-primary:#198754}</style>
 </head>
 <body class="bg-light">
 <div class="container py-4">
@@ -13,50 +13,36 @@
   <div th:if="${erro}" class="alert alert-danger" th:text="${erro}"></div>
 
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2>Checkout — Pedido #<span th:text="${pedido.id}"></span></h2>
-    <div>
-      <a class="btn btn-secondary" th:href="@{/pedidos}">← Voltar</a>
-    </div>
+    <a class="btn btn-outline-success btn-sm" th:href="@{/pedidos}">← Voltar</a>
+    <h2 class="mb-0">Checkout — Pedido #<span th:text="${pedido.id}"></span></h2>
+    <span></span>
   </div>
 
   <div class="row g-4">
-
-    <!-- Itens -->
     <div class="col-12 col-lg-8">
-      <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white">
-          Itens do Pedido
-        </div>
+      <div class="card shadow-sm border-success">
+        <div class="card-header bg-success text-white">Itens do Pedido</div>
         <div class="card-body">
           <div class="table-responsive">
             <table class="table align-middle">
-              <thead>
-              <tr>
-                <th>Produto</th>
-                <th class="text-end">Preço</th>
-                <th class="text-center">Qtd</th>
-                <th class="text-end">Subtotal</th>
-                <th style="width:140px;"></th>
-              </tr>
-              </thead>
+              <thead><tr><th>Produto</th><th class="text-end">Preço</th><th class="text-center">Qtd</th><th class="text-end">Subtotal</th><th style="width:140px;"></th></tr></thead>
               <tbody>
-              <tr th:each="it : ${pedido.itens}">
-                <td th:text="${it.produto.nome}"></td>
-                <td class="text-end" th:text="${#numbers.formatCurrency(it.precoUnitario)}"></td>
-                <td class="text-center">
-                  <form th:action="@{|/pedidos/checkout/${pedido.id}/alterar-quantidade|}" method="post" class="d-inline-flex gap-2">
-                    <input type="hidden" name="itemId" th:value="${it.id}">
-                    <input type="number" name="quantidade" min="1"
-                           th:value="${it.quantidade}" class="form-control form-control-sm" style="width:90px">
-                    <button class="btn btn-sm btn-outline-primary" type="submit">Atualizar</button>
-                  </form>
-                </td>
-                <td class="text-end" th:text="${#numbers.formatCurrency(it.subtotal)}"></td>
-                <td><!-- botão de remover item, se quiser --></td>
-              </tr>
-              <tr th:if="${#lists.isEmpty(pedido.itens)}">
-                <td colspan="5" class="text-center text-muted">Sem itens.</td>
-              </tr>
+                <tr th:each="it : ${pedido.itens}">
+                  <td th:text="${it.produto.nome}"></td>
+                  <td class="text-end" th:text="${#numbers.formatCurrency(it.precoUnitario)}"></td>
+                  <td class="text-center">
+                    <form th:action="@{|/pedidos/checkout/${pedido.id}/alterar-quantidade|}" method="post" class="d-inline-flex gap-2">
+                      <input type="hidden" name="itemId" th:value="${it.id}">
+                      <input type="number" name="quantidade" min="1" th:value="${it.quantidade}" class="form-control form-control-sm" style="width:90px">
+                      <button class="btn btn-sm btn-outline-success" type="submit">Atualizar</button>
+                    </form>
+                  </td>
+                  <td class="text-end" th:text="${#numbers.formatCurrency(it.subtotal)}"></td>
+                  <td></td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(pedido.itens)}">
+                  <td colspan="5" class="text-center text-muted">Sem itens.</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -64,69 +50,49 @@
       </div>
     </div>
 
-    <!-- Resumo + Pagamento -->
     <div class="col-12 col-lg-4">
-
-      <!-- Resumo -->
-      <div class="card shadow-sm mb-3">
-        <div class="card-header bg-dark text-white">Resumo</div>
+      <div class="card shadow-sm mb-3 border-success">
+        <div class="card-header bg-success text-white">Resumo</div>
         <div class="card-body">
-          <dl class="row">
-            <dt class="col-6">Produtos</dt>
-            <dd class="col-6 text-end" th:text="${#numbers.formatCurrency(pedido.totalProdutos)}"></dd>
-
-            <dt class="col-6">Desconto</dt>
-            <dd class="col-6 text-end" th:text="${#numbers.formatCurrency(pedido.desconto)}"></dd>
-
-            <dt class="col-6">Frete</dt>
-            <dd class="col-6 text-end" th:text="${#numbers.formatCurrency(pedido.frete)}"></dd>
-
-            <dt class="col-6 fs-5">Total</dt>
-            <dd class="col-6 text-end fs-5 fw-semibold" th:text="${#numbers.formatCurrency(pedido.valorTotal)}"></dd>
+          <dl class="row mb-0">
+            <dt class="col-6">Produtos</dt><dd class="col-6 text-end" th:text="${#numbers.formatCurrency(pedido.totalProdutos)}"></dd>
+            <dt class="col-6">Desconto</dt><dd class="col-6 text-end" th:text="${#numbers.formatCurrency(pedido.desconto)}"></dd>
+            <dt class="col-6">Frete</dt><dd class="col-6 text-end" th:text="${#numbers.formatCurrency(pedido.frete)}"></dd>
+            <dt class="col-6 fs-5">Total</dt><dd class="col-6 text-end fs-5 fw-semibold" th:text="${#numbers.formatCurrency(pedido.valorTotal)}"></dd>
           </dl>
 
-          <!-- aplicar frete/desconto -->
-          <form th:action="@{|/pedidos/checkout/${pedido.id}/resumo|}" method="post" class="row g-2">
+          <form th:action="@{|/pedidos/checkout/${pedido.id}/resumo|}" method="post" class="row g-2 mt-2">
             <div class="col-6">
               <label class="form-label">Desconto (R$)</label>
-              <input class="form-control" name="desconto" type="number" step="0.01"
-                     th:value="${pedido.desconto}">
+              <input class="form-control" name="desconto" type="number" step="0.01" th:value="${pedido.desconto}">
             </div>
             <div class="col-6">
               <label class="form-label">Frete (R$)</label>
-              <input class="form-control" name="frete" type="number" step="0.01"
-                     th:value="${pedido.frete}">
+              <input class="form-control" name="frete" type="number" step="0.01" th:value="${pedido.frete}">
             </div>
             <div class="col-12 d-grid mt-2">
-              <button class="btn btn-outline-dark" type="submit">Aplicar</button>
+              <button class="btn btn-outline-success" type="submit">Aplicar</button>
             </div>
           </form>
         </div>
       </div>
 
-      <!-- Pagamento -->
-      <div class="card shadow-sm">
+      <div class="card shadow-sm border-success">
         <div class="card-header bg-success text-white">Pagamento</div>
         <div class="card-body">
           <form th:action="@{|/pedidos/checkout/${pedido.id}/pagar|}" method="post" class="row g-3">
             <div class="col-12">
-              <label class="form-label" for="forma">Forma de pagamento</label>
+              <label for="forma" class="form-label">Forma de pagamento</label>
               <select class="form-select" id="forma" name="forma" required>
                 <option value="">Selecione...</option>
-                <!-- Busca diretamente do enum, sem depender do Model -->
                 <option th:each="f : ${T(br.com.aweb.sistema_vendas.model.FormaPagamento).values()}"
-                        th:value="${f.name()}"
-                        th:text="${#strings.capitalize(f.name().replace('_',' '))}">
-                </option>
+                        th:value="${f.name()}" th:text="${#strings.capitalize(f.name().replace('_',' '))}"></option>
               </select>
             </div>
-
             <div class="col-12">
               <label class="form-label" for="detalhes">Detalhes (opcional)</label>
-              <input class="form-control" id="detalhes" name="detalhes"
-                     placeholder="ex.: cartao **** 1234 / boleto 341...">
+              <input class="form-control" id="detalhes" name="detalhes" placeholder="cartao **** 1234 / boleto 341...">
             </div>
-
             <div class="col-12 d-grid">
               <button class="btn btn-success" type="submit">Finalizar pagamento</button>
             </div>
